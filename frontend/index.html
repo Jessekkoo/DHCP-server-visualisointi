@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8"/>
+<title>Leases</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+  }
+  #left {
+    flex: 1;
+    border-right: 1px solid #ccc;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  #right {
+    width: 45%;
+    padding: 0;
+    display: none;
+    flex-direction: column;
+    border-left: 1px solid #ccc;
+    background: #fafafa;
+  }
+  #details-header {
+    padding: 15px;
+    font-size: 20px;
+    background: #e0e0e0;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #close-details {
+    cursor: pointer;
+    font-size: 22px;
+    padding: 0 10px;
+  }
+  #details-content {
+    padding: 20px;
+  }
+  #details-content div {
+    margin-bottom: 10px;
+    font-size: 17px;
+  }
+  #search {
+    padding: 8px;
+    width: 250px;
+    font-size: 16px;
+    margin-bottom: 15px;
+  }
+  .server-header, .subnet-header {
+    padding: 10px;
+    background: #e0e0e0;
+    margin-top: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    border: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .server-content, .subnet-content {
+    margin-left: 20px;
+    display: none;
+  }
+  table {
+    border-collapse: collapse;
+    width: 95%;
+    margin-bottom: 15px;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    text-align: left;
+  }
+  tr:nth-child(even) {
+    background: #fafafa;
+  }
+  .icon {
+    width: 14px;
+    display: inline-block;
+    text-align: center;
+  }
+  .details-btn {
+    cursor: pointer;
+    font-size: 18px;
+    text-align: center;
+  }
+  .details-btn:hover {
+    background: #dfefff !important;
+  }
+  .expired-lease {
+    background-color: #9b9b9b !important;
+  }
+
+</style>
+</head>
+<body>
+
+<div id="left">
+  <h2>Leases</h2>
+  <input id="search" type="text" placeholder="Hae IP tai MAC-osoitetta...">
+  <span id="count" style="margin-left:10px; font-weight:bold;"></span>
+  <label style="margin-left:10px;">
+    <input type="checkbox" id="only-active">
+    Näytä vain aktiiviset
+  </label>
+  <div id="tree"></div>
+</div>
+
+<div id="right">
+  <div id="details-header">
+    <span>Details</span>
+    <span id="close-details">✖</span>
+  </div>
+  <div id="details-content"></div>
+</div>
+
+<script>
+let leases = [];
+
+function loadJson() {
+  fetch("/backend/leases.sh?ts=" + Date.now())
+    .then(r => r.json())
+    .then(d => {
+      leases = d;
+      buildTree();
+    })
+    .catch(e => console.error("JSON load error:", e));
+}
+
+
+function loadSingleSnmp(ip) {
+  const out = document.getElementById("snmp-output");
+  out.textContent = "Haetaan SNMP‑tietoja...";
+
+  fetch("/backend/snmp_single.sh?ip=" + ip)
+    .then(r => r.json())
+    .then(json => {
+
+      localStorage.setItem("snmp_" + ip, JSON.stringify(json));
+
+      showSnmp(json);
+    })
+    .catch(() => {
+      out.textCbontent = "Virhe SNMP‑haussa";
+    });
+}
+
+function showSnmp(json) {
+  document.getElementById("snmp-output").textContent =
+`sysName: ${json.sysName}
+sysDescr: ${json.sysDescr}
+sysLocation: ${json.sysLocation}
+sysContact: ${json.sysContact}
+sysUpTime: ${json.sysUpTime}`;
+}
+
+function loadPing(ip) {
+  const out = document.getElementById("ping-output");
+  out.textContent = "Pingataan...";
+
+  fetch("/backend/ping_single.sh?ip=" + ip)
+    .then(r => r.json())
+    .then(json => {
+      if (json.status === "ok") {
+        out.textContent =
+          "Ping OK\n" +
+          "Packet loss: " + json.packetLoss + "%\n" +
+          "RTT: " + json.rtt + " ms";
+      } else {
+        out.textContent = "Ei vastaa (100% packet loss)";
+      }
+    })
+    .catch(() => {
+      out.textContent = "Virhe pingissä";
+    });
+}
+
+
+loadJson();
+setInterval(loadJson, 300000);
+document.getElementById("search").addEventListener("input", buildTree);
+document.getElementById("only-active").addEventListener("change", buildTree);
+
+function ipToNumber(ip) {
+  if (ip === "0.0.0.0") return 999999999999;
+  return ip.split('.').map(x => parseInt(x)).reduce((a,b)=>a*256+b);
+}
+
+function maskToCidr(mask) {
+  return mask
+    .split(".")
+    .map(o => parseInt(o))
+    .reduce((sum, o) => sum + o.toString(2).split("1").length - 1, 0);
+}
+
+function cidrToMaxHosts(cidr) {
+  if (cidr === 31) return 2;
+  if (cidr >= 32) return 1;
+  return Math.pow(2, 32 - cidr) - 2;
+}
+
+function parseLeaseDate(str) {
+  if (typeof str !== "string") return null;
+
+  const parts = str.split(" ");
+  if (parts.length !== 2) return null;
+
+  const dateParts = parts[0].split("/");
+  const timeParts = parts[1].split(":");
+
+  if (dateParts.length !== 3 || timeParts.length !== 3) return null;
+
+  return new Date(
+    parseInt(dateParts[0], 10),
+    parseInt(dateParts[1], 10) - 1,
+    parseInt(dateParts[2], 10),
+    parseInt(timeParts[0], 10),
+    parseInt(timeParts[1], 10),
+    parseInt(timeParts[2], 10)
+  );
+}
+
+function isExpiredLease(r) {
+  if (!r || !r.ends) return false;
+
+  const endDate = parseLeaseDate(r.ends);
+  if (!endDate) return false;
+
+  return endDate < new Date();
+}
+
+function openDetails(r) {
+  const right = document.getElementById("right");
+  right.style.display = "flex";
+
+  const d = document.getElementById("details-content");
+
+  // DHCP4 leases2.json
+  if (r.server === "dhcp4") {
+    d.innerHTML = `
+      <div><b>IP:</b> ${r.ip}</div>
+      <div><b>Hostname:</b> ${r.hostname}</div>
+      <div><b>End:</b> ${r.ends}</div>
+
+      <hr>
+      <button onclick="loadSingleSnmp('${r.ip}')">Hae SNMP‑tiedot</button>
+      <pre id="snmp-output" style="background:#eee;padding:10px;"></pre>
+
+      <button onclick="loadPing('${r.ip}')">Ping</button>
+      <pre id="ping-output" style="background:#eee;padding:10px;"></pre>
+    `;
+
+  } else {
+
+  // DHCP1–3
+  d.innerHTML = `
+    <div><b>IP:</b> ${r.ip}</div>
+    <div><b>Start:</b> ${r.starts}</div>
+    <div><b>End:</b> ${r.ends}</div>
+    <div><b>vendor-class-identifier:</b> ${r.vendor}</div>
+
+    <hr>
+    <button onclick="loadSingleSnmp('${r.ip}')">Hae SNMP‑tiedot</button>
+    <pre id="snmp-output" style="background:#eee;padding:10px;"></pre>
+
+    <button onclick="loadPing('${r.ip}')">Ping</button>
+    <pre id="ping-output" style="background:#eee;padding:10px;"></pre>
+ `;
+}
+
+const cached = localStorage.getItem("snmp_" + r.ip);
+if (cached) {
+  showSnmp(JSON.parse(cached));
+}
+
+fetch("/backend/snmp_data/" + r.ip + ".json")
+  .then(r => r.ok ? r.json() : null)
+  .then(j => {
+    if (j) showSnmp(j);
+  });
+}
+
+document.getElementById("close-details").onclick = () => {
+  const right = document.getElementById("right");
+  right.style.display = "none";
+  document.getElementById("details-content").innerHTML = "";
+};
+
+const serverName = {
+    "dhcp1": "172.30.20.243",
+    "dhcp2": "172.30.16.164",
+    "dhcp3": "172.30.22.38",
+    "dhcp4": "172.30.216.1"
+};
+
+function buildTree() {
+  const search = document.getElementById("search").value.toLowerCase();
+  const c = document.getElementById("tree");
+  c.innerHTML = "";
+  let count = 0;
+
+  const servers = {};
+  leases.forEach(x => {
+    if (!servers[x.server]) servers[x.server] = {};
+    if (!servers[x.server][x.subnet]) servers[x.server][x.subnet] = [];
+    servers[x.server][x.subnet].push(x);
+  });
+
+  Object.keys(servers).sort().forEach(server => {
+    let serverHasMatch = false;
+
+    const sh = document.createElement("div");
+    sh.className = "server-header";
+
+    const si = document.createElement("span");
+    si.className = "icon";
+    si.textContent = "▶";
+
+    const sl = document.createElement("span");
+    sl.textContent = "DHCP Server: " + (serverName[server] || server);
+
+    sh.appendChild(si);
+    sh.appendChild(sl);
+
+    const sc = document.createElement("div");
+    sc.className = "server-content";
+    sc.style.display = "none";
+
+    sh.onclick = () => {
+  const opening = sc.style.display === "none";
+
+  sc.style.display = opening ? "block" : "none";
+  si.textContent = opening ? "▼" : "▶";
+
+  if (!opening) {
+    sc.querySelectorAll(".subnet-content").forEach(uc => {
+      uc.style.display = "none";
+    });
+    sc.querySelectorAll(".subnet-header .icon").forEach(icon => {
+      icon.textContent = "▶";
+    });
+  }
+};
+
+    Object.keys(servers[server])
+      .sort((a,b)=>ipToNumber(a)-ipToNumber(b))
+      .forEach(subnet => {
+
+      let subnetHasMatch = false;
+
+      const uh = document.createElement("div");
+      uh.className = "subnet-header";
+
+      const ui = document.createElement("span");
+      ui.className = "icon";
+      ui.textContent = "▶";
+
+      const ul = document.createElement("span");
+const subnetMask = servers[server][subnet][0].mask;
+const cidr = maskToCidr(subnetMask);
+
+const onlyActive =
+  document.getElementById("only-active").checked;
+
+const used = servers[server][subnet].filter(r => {
+  if (onlyActive) {
+    return !isExpiredLease(r);
+  }
+  return true;
+}).length;
+
+const max = cidrToMaxHosts(cidr);
+
+ul.textContent =
+  "Subnet: " + subnet + "/" + cidr +
+  " (" + used + " / " + max + ")";
+
+      uh.appendChild(ui);
+      uh.appendChild(ul);
+
+      const uc = document.createElement("div");
+      uc.className = "subnet-content";
+      uc.style.display = "none";
+
+      uh.onclick = () => {
+        const o = uc.style.display === "none";
+        uc.style.display = o ? "block" : "none";
+        ui.textContent = o ? "▼" : "▶";
+      };
+
+      const rows = servers[server][subnet]
+        .sort((a,b)=>ipToNumber(a.ip)-ipToNumber(b.ip));
+
+      const t = document.createElement("table");
+
+      t.innerHTML = `
+	<tr>
+	  <th style="text-align: center;">IP</th>
+	  <th style="text-align: center;">Mask</th>
+	  <th style="text-align: center;">Mac</th>
+	  <th style="text-align: center;">Show Details</th>
+	</tr>
+	`;
+
+      rows.forEach(r => {
+	const onlyActive =
+	  document.getElementById("only-active").checked;
+
+        const match =
+          r.ip.toLowerCase().includes(search) ||
+          (r.mac && r.mac.toLowerCase().includes(search));
+        if (
+	  (search === "" || match) &&
+	  !(onlyActive && isExpiredLease(r))
+	 ) {
+          const tr = document.createElement("tr");
+
+	  if (isExpiredLease(r)) {
+	    tr .classList.add("expired-lease");
+	  }
+
+	  tr.innerHTML = `
+	    <td style="text-align: center;">${r.ip}</td>
+	    <td style="text-align: center;">${r.mask}</td>
+	    <td style="text-align: center;">${r.mac}</td>
+	    <td class="details-btn">Details</td>
+	`;
+
+          tr.querySelector(".details-btn").onclick = () => openDetails(r);
+
+          t.appendChild(tr);
+          subnetHasMatch = true;
+          count++;
+        }
+      });
+
+      if (subnetHasMatch) {
+        sc.appendChild(uh);
+        sc.appendChild(uc);
+        uc.appendChild(t);
+        serverHasMatch = true;
+
+        if (search !== "") {
+          sc.style.display = "block";
+          uc.style.display = "block";
+          ui.textContent = "▼";
+          sh.querySelector(".icon").textContent = "▼";
+        }
+      }
+    });
+
+    if (serverHasMatch || search === "") {
+      c.appendChild(sh);
+      c.appendChild(sc);
+    }
+  });
+
+  document.getElementById("count").textContent = count + " IP-osoitetta";
+}
+</script>
+
+</body>
+</html>
