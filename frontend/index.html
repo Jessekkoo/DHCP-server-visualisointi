@@ -102,12 +102,16 @@
 
 <div id="left">
   <h2>Leases</h2>
+  <div style="background-color: #9b9b9b; margin-right: 500px; margin-bottom: 10px;">
+   Harmaataustaiset osoitteet eivät ole aktiivisia
+  </div>
   <input id="search" type="text" placeholder="Hae IP tai MAC-osoitetta...">
   <span id="count" style="margin-left:10px; font-weight:bold;"></span>
   <label style="margin-left:10px;">
     <input type="checkbox" id="only-active">
     Näytä vain aktiiviset
   </label>
+  <button id="clear-search" style="margin-left:5px;">Clear Search</button>
   <div id="tree"></div>
 </div>
 
@@ -156,7 +160,8 @@ function showSnmp(json) {
 sysDescr: ${json.sysDescr}
 sysLocation: ${json.sysLocation}
 sysContact: ${json.sysContact}
-sysUpTime: ${json.sysUpTime}`;
+sysUpTime: ${json.sysUpTime}
+Tiedot haettu: ${json.updated_fi}`;
 }
 
 function loadPing(ip) {
@@ -183,8 +188,32 @@ function loadPing(ip) {
 
 loadJson();
 setInterval(loadJson, 300000);
-document.getElementById("search").addEventListener("input", buildTree);
 document.getElementById("only-active").addEventListener("change", buildTree);
+const searchInput = document.getElementById("search");
+
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === " ") {
+    e.preventDefault();
+  }
+});
+
+searchInput.addEventListener("input", () => {
+  const cleaned = searchInput.value.replace(/\s+/g, "");
+  if (searchInput.value !== cleaned) {
+    searchInput.value = cleaned;
+  }
+  buildTree();
+});
+
+const clearBtn = document.getElementById("clear-search");
+
+clearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+
+  document.getElementById("only-active").checked = false;
+
+  buildTree();
+});
 
 function ipToNumber(ip) {
   if (ip === "0.0.0.0") return 999999999999;
@@ -277,12 +306,6 @@ const cached = localStorage.getItem("snmp_" + r.ip);
 if (cached) {
   showSnmp(JSON.parse(cached));
 }
-
-fetch("/backend/snmp_data/" + r.ip + ".json")
-  .then(r => r.ok ? r.json() : null)
-  .then(j => {
-    if (j) showSnmp(j);
-  });
 }
 
 document.getElementById("close-details").onclick = () => {
