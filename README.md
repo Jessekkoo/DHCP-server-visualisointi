@@ -42,3 +42,11 @@ Sovellus soveltuu erityisesti:
 serveri1 10.10.10.10 kayttaja isc no
 serveri2 11.11.11.11 user1 udm no
 ```
+---
+## Toiminta
+Tarvitset:
+- lighttpd
+- ssh yhteys
+- sshpass
+- linux palvelin(putty)
+
