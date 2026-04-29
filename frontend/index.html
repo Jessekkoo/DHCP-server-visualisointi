@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fi">
 <head>
@@ -124,6 +125,29 @@
 </div>
 
 <script>
+function loadComment(ip) {
+  fetch("/backend/comments/" + ip + ".json")
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      if (j && j.comment) {
+        document.getElementById("comment-box").value = j.comment;
+      }
+    });
+}
+
+function saveComment(ip) {
+  const comment = document.getElementById("comment-box").value;
+
+  fetch("/backend/save_comment.sh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ip: ip,
+      comment: comment
+    })
+  });
+}
+
 let leases = [];
 
 function loadJson() {
@@ -282,6 +306,13 @@ function openDetails(r) {
 
       <button onclick="loadPing('${r.ip}')">Ping</button>
       <pre id="ping-output" style="background:#eee;padding:10px;"></pre>
+
+      <hr>
+      <div>
+	<b>Comment:</b><br>
+	<textarea id="comment-box" rows="4" style="width:100%;"></textarea><br>
+	<button id="save-comment">Save comment</button>
+      </div>
     `;
 
   } else {
@@ -299,7 +330,23 @@ function openDetails(r) {
 
     <button onclick="loadPing('${r.ip}')">Ping</button>
     <pre id="ping-output" style="background:#eee;padding:10px;"></pre>
+
+     <hr>
+     <div>
+       <b>Comment:</b><br>
+       <textarea id="comment-box" rows="4" style="width:100%;"></textarea><br>
+       <button id="save-comment">Save comment</button>
+     </div>
  `;
+
+// Lataa aiempi kommentti backendistä
+loadComment(r.ip);
+
+// Kytke tallennusnappi
+document.getElementById("save-comment").onclick = () => {
+  saveComment(r.ip);
+};
+
 }
 
 const cached = localStorage.getItem("snmp_" + r.ip);
