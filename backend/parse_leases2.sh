@@ -1,8 +1,8 @@
 #!/bin/bash
 
-LEASES="/home/teleste/dnsmasq.lease"
-OUTPUT="/home/teleste/backend/leases2.json"
-TMP="/home/teleste/backend/leases2.json.tmp"
+LEASES="/oma-polku/dnsmasq.lease"
+OUTPUT="/oma-polku/backend/leases2.json"
+TMP="/omapolku/backend/leases2.json.tmp"
 
 SERVER="dhcp4"
 MASK="255.255.248.0"
