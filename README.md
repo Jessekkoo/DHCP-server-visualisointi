@@ -36,6 +36,7 @@ Sovellus soveltuu erityisesti:
 
 ## DHCP-serverin lisäys
 ***serverit.conf*** tiedostoon lisätään # name ip user type password(yes/no)
+- Sovellus on tehty toimimaan isc ja unifi servereille.
 ```bash
 # name ip user type password(yes/no)
 serveri1 10.10.10.10 kayttaja isc no
