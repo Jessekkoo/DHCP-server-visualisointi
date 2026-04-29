@@ -315,6 +315,14 @@ function openDetails(r) {
       </div>
     `;
 
+// Lataa aiempi kommentti backendistä
+loadComment(r.ip);
+
+// Kytke tallennusnappi
+document.getElementById("save-comment").onclick = () => {
+  saveComment(r.ip);
+};
+
   } else {
 
   // DHCP1–3
