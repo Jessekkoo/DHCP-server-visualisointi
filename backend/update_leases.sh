@@ -2,9 +2,9 @@
 
 set -e
 
-/home/teleste/backend/get_leases.sh
-/home/teleste/backend/get_conf.sh
-/home/teleste/backend/get_leases_json.sh
-/home/teleste/backend/get_dnsmasq.sh
-/home/teleste/backend/parse_leases2.sh
+/oma-polku/backend/get_leases.sh
+/oma-polku/backend/get_conf.sh
+/oma-polku/backend/get_leases_json.sh
+/oma-polku/backend/get_dnsmasq.sh
+/oma-polku/backend/parse_leases2.sh
 
