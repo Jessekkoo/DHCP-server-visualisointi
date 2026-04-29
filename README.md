@@ -49,4 +49,10 @@ Tarvitset:
 - ssh yhteys
 - sshpass
 - linux palvelin(putty)
-
+# Vaihda omat polut/hakemistot backend skripteihin ja croniin
+---
+## Crontab päivittäminen
+Kirjoita **crontab -e** ja lisää sinne:
+```bash
+*/5 * * * * /oma-polku/backend/update_leases.sh >> /oma-polku/cron_debug.log 2>&1
+```
