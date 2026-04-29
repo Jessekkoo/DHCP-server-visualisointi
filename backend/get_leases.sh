@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-CONF="/home/teleste/serverit.conf"
-OUT="/home/teleste"
+CONF="/oma-polku/serverit.conf"
+OUT="/oma-polku"
 
 if [[ ! -f "$CONF" ]]; then
     echo "VIRHE: conf-tiedostoa ei löydy: $CONF" >&2
