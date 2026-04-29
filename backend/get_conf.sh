@@ -1,8 +1,8 @@
 #!/bin/bash
 
-CONF="/home/teleste/serverit.conf"
-OUT="/home/teleste/subnetit.txt"
-TMP="/home/teleste/tmp_dhcp"
+CONF="/oma-polku/serverit.conf"
+OUT="/oma-polku/subnetit.txt"
+TMP="/oma-polku/tmp_dhcp"
 
 mkdir -p "$TMP"
 > "$OUT"
