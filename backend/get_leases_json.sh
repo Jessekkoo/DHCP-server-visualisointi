@@ -1,7 +1,7 @@
 #!/bin/bash
 
-BASE="/home/teleste"
-BACKEND="/home/teleste/backend"
+BASE="/oma-polku"
+BACKEND="/oma-polku/backend"
 
 OUTPUT="$BACKEND/leases.json"
 TMP="$BACKEND/leases.json.tmp"
