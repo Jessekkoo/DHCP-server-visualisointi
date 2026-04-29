@@ -1,8 +1,8 @@
 #!/bin/bash
 
 JSON="leases.json"
-LOG="/home/teleste/leasewatch.log"
-DEBUG="/home/teleste/cron_debug.log"
+LOG="/oma-polku/leasewatch.log"
+DEBUG="/oma-polku/cron_debug.log"
 
 JQ="/usr/bin/jq"
 
