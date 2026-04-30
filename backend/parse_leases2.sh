@@ -5,7 +5,7 @@ OUTPUT="/oma-polku/backend/leases2.json"
 TMP="/omapolku/backend/leases2.json.tmp"
 
 SERVER="dhcp4"
-MASK="255.255.248.0"
+MASK="<MASK>"
 FIRST=1
 
 echo "[" > "$TMP"
